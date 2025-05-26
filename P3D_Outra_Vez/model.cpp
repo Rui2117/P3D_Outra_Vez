@@ -8,8 +8,8 @@
 
 // Construtor: carrega o modelo OBJ e prepara o mesh para renderização
 ObjModel::ObjModel(const std::string& path) {
-    loadOBJ(path);
-    setupMesh();
+    loadOBJ(path);      // Lê o ficheiro OBJ e preenche os vetores de dados
+    setupMesh();        // Prepara os buffers OpenGL (VAO/VBO) para renderização
 }
 
 // Lê e interpreta um arquivo OBJ, preenchendo os vetores de vértices, normais, texturas e índices
@@ -84,14 +84,17 @@ void ObjModel::loadOBJ(const std::string& path) {
         glm::vec2 t = texcoords[texcoordIndices[i]];
         glm::vec3 n = normals[normalIndices[i]];
 
+        // Adiciona posição
         interleaved.push_back(v.x);
         interleaved.push_back(v.y);
         interleaved.push_back(v.z);
 
+        // Adiciona normal
         interleaved.push_back(n.x);
         interleaved.push_back(n.y);
         interleaved.push_back(n.z);
 
+        // Adiciona coordenada de textura
         interleaved.push_back(t.x);
         interleaved.push_back(t.y);
     }
@@ -190,18 +193,21 @@ void ObjModel::loadTexture(const std::string& filename, GLuint& texID) {
 void ObjModel::draw(GLuint program, const glm::mat4& view, const glm::mat4& projection) const {
     glBindVertexArray(VAO);
 
+    // Calcula a matriz Model-View-Projection (MVP) para posicionar o modelo na cena
     glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
     glm::mat4 mvp = projection * view * model;
 
+    // Passa a matriz MVP para o shader
     GLint mvpLoc = glGetUniformLocation(program, "MVP");
     glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
 
-    // Passa textura (se houver)
+    // Se houver textura associada ao material atual, ativa e associa
     auto it = materials.find(currentMaterialName);
     if (it != materials.end() && it->second.diffuseTexID) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, it->second.diffuseTexID);
     }
 
+    // Desenha o modelo como uma sequência de triângulos
     glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertexIndices.size()));
 }
