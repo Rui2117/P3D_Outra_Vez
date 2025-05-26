@@ -187,13 +187,21 @@ void ObjModel::loadTexture(const std::string& filename, GLuint& texID) {
 }
 
 // Renderiza o modelo: ativa a textura (se houver) e desenha os triângulos
-void ObjModel::draw() const {
+void ObjModel::draw(GLuint program, const glm::mat4& view, const glm::mat4& projection) const {
+    glBindVertexArray(VAO);
+
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
+    glm::mat4 mvp = projection * view * model;
+
+    GLint mvpLoc = glGetUniformLocation(program, "MVP");
+    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+
+    // Passa textura (se houver)
     auto it = materials.find(currentMaterialName);
     if (it != materials.end() && it->second.diffuseTexID) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, it->second.diffuseTexID);
     }
 
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, vertexIndices.size());
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertexIndices.size()));
 }

@@ -6,6 +6,9 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 
 // Estrutura que representa um material carregado de um ficheiro .mtl
 struct Material {
@@ -17,12 +20,16 @@ struct Material {
 // Classe para carregar, armazenar e desenhar modelos OBJ
 class ObjModel {
 public:
+    glm::vec3 position = glm::vec3(0.0f);   // Posição do modelo no espaço 3D
+    
     // Construtor: carrega o modelo a partir do ficheiro OBJ
     ObjModel(const std::string& path);
 
     // Desenha o modelo (usa o VAO e as texturas, se existirem)
-    void draw() const;
+    void draw(GLuint program, const glm::mat4& view, const glm::mat4& projection) const;
 
+    // Define a posição do modelo (usada para transformações)
+    void setPosition(const glm::vec3& pos) { position = pos; }
 private:
     // Carrega o ficheiro OBJ e preenche os vetores de vértices, normais, texturas e índices
     void loadOBJ(const std::string& path);
@@ -35,6 +42,9 @@ private:
 
     // Carrega uma textura de imagem para a GPU
     void loadTexture(const std::string& filename, GLuint& texID);
+
+
+	
 
     // Vetores para armazenar os dados do modelo
     std::vector<glm::vec3> vertices;        // Lista de vértices

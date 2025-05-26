@@ -33,7 +33,7 @@
 // Declaração de funções auxiliares
 void print_error(int error, const char* description);
 void init(void);
-void display(void);
+void display(glm::mat4 view, glm::mat4 projection);
 
 #define NumBuffers 3 // Número de buffers: vértices, cores, EBO
 
@@ -153,7 +153,7 @@ int main(void)
 
         GLint mvpId = glGetUniformLocation(program, "MVP");
         glUniformMatrix4fv(mvpId, 1, GL_FALSE, glm::value_ptr(mvp));
-        display();
+        display(view, projection);
 
         // --- 2. Mini-mapa (canto superior direito)
         int miniWidth = 150, miniHeight = 150;
@@ -164,7 +164,7 @@ int main(void)
         glm::mat4 miniMVP = miniProj * miniView * model;
 
         glUniformMatrix4fv(mvpId, 1, GL_FALSE, glm::value_ptr(miniMVP));
-        display();
+        display(miniView, miniProj);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -261,22 +261,25 @@ void init(void) {
 }
 
 // Função de desenho chamada a cada frame
-void display(void)
+void display(glm::mat4 view, glm::mat4 projection)
 {
     GLint objectTypeLoc = glGetUniformLocation(program, "objectType");
     GLint hasTextureLoc = glGetUniformLocation(program, "hasTexture");
-
-    // Desenha o modelo (bola de bilhar)
-    glUniform1i(objectTypeLoc, 1);
-    glUniform1i(hasTextureLoc, true);
-    bola1->draw();
-    bola2->draw();
-    glBindVertexArray(VAO);
 
     // Desenha a mesa (cubo)
     glUniform1i(objectTypeLoc, 0);
     glUniform1i(hasTextureLoc, false);
     glDrawElements(GL_TRIANGLES, NumIndices, GL_UNSIGNED_INT, (void*)0);
+
+    // Desenha o modelo (bola de bilhar)
+    glUniform1i(objectTypeLoc, 1);
+    glUniform1i(hasTextureLoc, true);
+    bola1->position = glm::vec3(3, -1, 2); // Exemplo de posição
+    bola2->position = glm::vec3(-3, 1, -2);
+
+    bola1->draw(program, view, projection);
+    bola2->draw(program, view, projection);
+    glBindVertexArray(VAO);
 }
 
 // Callback de erro do GLFW
