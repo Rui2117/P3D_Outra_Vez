@@ -1,261 +1,378 @@
 #pragma region includes
+/***********************************************************************
+ * Billiards Game OpenGL Implementation
+ *
+ * This file implements a 3D billiards game using Modern OpenGL (3.3+).
+ * It includes camera controls, lighting, and 3D model rendering.
+ ***********************************************************************/
 
-// Vincula as bibliotecas necessárias para o projeto
+ // Vinculação de bibliotecas necessárias
 #pragma comment(lib, "glew32s.lib")
 #pragma comment(lib, "glfw3.lib")
 #pragma comment(lib, "opengl32.lib")
 
+// Inclusões padrão
 #include <iostream>
 #include <vector>
 
-// Define que o GLEW será usado de forma estática
+// Configuração do GLEW para linkagem estática
 #define GLEW_STATIC
 #include <GL\glew.h>
 #include <gl\GL.h>
 #include <GLFW\glfw3.h>
 
-// Inclui GLM para operações matemáticas com vetores e matrizes
+// GLM para operações matemáticas 3D
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Inclui headers do projeto
+// Cabeçalhos do projeto
 #include "shader.h"
 #include "camera.h"
 #include "model.h"
 
-#pragma endregion
+/**
+ * Constantes de configuração da janela e visualização
+ */
+constexpr int WIDTH = 640;           // Largura da janela principal
+constexpr int HEIGHT = 480;          // Altura da janela principal
+constexpr int MINIMAP_SIZE = 150;    // Tamanho do minimapa
+constexpr int MINIMAP_PADDING = 10;  // Espaçamento do minimapa
 
-// Define o tamanho da janela
-#define WIDTH 640
-#define HEIGHT 480
+/**
+ * Configurações do OpenGL
+ */
+#define NumBuffers 3                 // Número de buffers OpenGL (vértices, cores, índices)
+const GLuint NumVertices = 8;        // Número de vértices da mesa
+const GLuint NumIndices = 6 * 2 * 3; // Número de índices para triângulos
 
+/**
+ * Limites da câmera
+ */
+constexpr float MIN_FOV = 15.0f;     // Campo de visão mínimo
+constexpr float MAX_FOV = 90.0f;     // Campo de visão máximo
+constexpr float MIN_HEIGHT = 0.5f;   // Altura mínima da câmera
+constexpr float MAX_HEIGHT = 30.0f;  // Altura máxima da câmera
+
+/**
+ * Estrutura para controle de iluminação
+ * Gerencia propriedades da luz ambiente
+ */
 struct LightingParams {
-    glm::vec3 ambientLight;
-    float ambientIntensity;
-    bool isAmbientLightOn;  // Novo: controla se a luz está ligada ou desligada
+    glm::vec3 ambientLight;      // Cor da luz ambiente
+    float ambientIntensity;      // Intensidade da luz ambiente
+    bool isAmbientLightOn;       // Estado da luz ambiente (ligada/desligada)
 
     LightingParams() :
-        ambientLight(1.0f, 1.0f, 1.0f),
+        ambientLight(1.0f),
         ambientIntensity(1.0f),
         isAmbientLightOn(true) {
     }
 };
 
-LightingParams lighting;
+/**
+ * Estrutura para luz pontual
+ * Define posição e propriedades de uma fonte de luz
+ */
+struct Light {
+    glm::vec3 position;  // Posição da luz no espaço 3D
+    glm::vec3 color;     // Cor da luz
+    float intensity;     // Intensidade da luz
 
-// Declaração de funções auxiliares
+    Light() :
+        position(5.0f, 5.0f, 0.0f),
+        color(1.0f),
+        intensity(1.0f) {
+    }
+};
+
+/**
+ * Variáveis globais do estado do jogo
+ */
+LightingParams lighting;        // Controle de iluminação
+Light mainLight;                // Luz principal
+GLuint program;                 // Programa de shader
+GLuint VAO;                     // Vertex Array Object
+GLuint Buffers[NumBuffers];     // Buffer Objects
+Camera camera;                  // Câmera principal
+Camera topDownCamera;           // Câmera do minimapa
+
+std::vector<ObjModel*> bolas;   // Bolas de Bilhar
+
+/**
+ * Estrutura para controle de entrada do usuário
+ */
+struct InputState {
+    bool isPressing = false;         // Indica se botão do mouse está pressionado
+    double prevXpos = 0.0;          // Posição X anterior do mouse
+    double prevYpos = 0.0;          // Posição Y anterior do mouse
+    double xPos = 0.0;              // Posição X atual do mouse
+    double yPos = 0.0;              // Posição Y atual do mouse
+} input;
+
+// Declarações antecipadas de funções
 void print_error(int error, const char* description);
 void init(void);
-void display(glm::mat4 view, glm::mat4 projection);
+void display(const glm::mat4& view, const glm::mat4& projection);
 
-#define NumBuffers 3 // Número de buffers: vértices, cores, EBO
-
-GLuint program; // ID do programa de shader
-
-GLuint VAO; // Vertex Array Object
-GLuint Buffers[NumBuffers]; // Buffers para vértices, cores e índices
-const GLuint NumVertices = 8; // Número de vértices do cubo/mesa
-const GLuint NumIndices = 6 * 2 * 3; // 6 faces * 2 triângulos/face * 3 vértices/triângulo
-
-GLfloat rotation = 0.0f; // Rotação (não usada diretamente aqui)
-
-Camera camera; // Câmera principal
-Camera topDownCamera; // Câmera para o mini-mapa
-
-ObjModel* bola1; // Ponteiro para o modelo da bola1
-ObjModel* bola2; // Ponteiro para o modelo da bola2
-
-// Variáveis para controle do mouse
-bool isPressing = false;
-double prevXpos = 0.0, prevYpos = 0.0;
-double xPos = 0.0, yPos = 0.0;
-
+/**
+ * Callback de teclado
+ * Processa eventos de teclado para controle de iluminação
+ */
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS || action == GLFW_REPEAT) {
         switch (key) {
-        case GLFW_KEY_1:
+        case GLFW_KEY_1: // Tecla 1 liga/desliga luz ambiente
             lighting.isAmbientLightOn = !lighting.isAmbientLightOn;
             break;
         }
     }
 }
 
-// Callback para o scroll do mouse (zoom)
-void scrollCallBack(GLFWwindow* window, double xoffset, double yoffset)
-{
-    camera.fov -= static_cast<float>(yoffset);
-    camera.fov = glm::clamp(camera.fov, 15.0f, 90.0f); // Limita o zoom
-    std::cout << "FOV (Zoom) = " << camera.fov << std::endl;
+/**
+ * Callback de scroll do mouse
+ * Controla o zoom da câmera através do campo de visão (FOV)
+ */
+void scrollCallBack(GLFWwindow* window, double xoffset, double yoffset) {
+    camera.fov = glm::clamp(camera.fov - static_cast<float>(yoffset), MIN_FOV, MAX_FOV);
 }
 
-// Callback para o movimento do mouse (rotação e altura da câmera)
-void cursorCallBack(GLFWwindow* window, double xpos, double ypos)
-{
-    xPos = xpos;
-    yPos = ypos;
+/**
+ * Callback de movimento do mouse
+ * Controla a rotação e altura da câmera
+ */
+void cursorCallBack(GLFWwindow* window, double xpos, double ypos) {
+    input.xPos = xpos;
+    input.yPos = ypos;
 
-    if (isPressing) {
-        double deltaX = xpos - prevXpos;
-        camera.rotateAroundTarget(static_cast<float>(deltaX) / - WIDTH * glm::pi<float>());
-        prevXpos = xpos;
+    if (input.isPressing) {
+        // Rotação horizontal da câmera
+        const double deltaX = xpos - input.prevXpos;
+        camera.rotateAroundTarget(static_cast<float>(deltaX) / -WIDTH * glm::pi<float>());
+        input.prevXpos = xpos;
 
-        double deltaY = ypos - prevYpos;
-        camera.height += static_cast<float>(-deltaY) / HEIGHT;
-        camera.height = glm::clamp(camera.height, 0.5f, 30.0f); // Limita altura
+        // Ajuste de altura da câmera
+        const double deltaY = ypos - input.prevYpos;
+        camera.height = glm::clamp(
+            camera.height + static_cast<float>(-deltaY) / HEIGHT,
+            MIN_HEIGHT,
+            MAX_HEIGHT
+        );
         camera.updatePosition();
     }
 }
 
-// Callback para clique do mouse (ativa/desativa rotação)
-void mouseCallBack(GLFWwindow* window, int button, int action, int mods)
-{
-    if (button == GLFW_MOUSE_BUTTON_LEFT)
-    {
-        if (action == GLFW_PRESS)
-        {
-            isPressing = true;
-            prevXpos = xPos;
-            prevYpos = yPos;
-        }
-        else if (action == GLFW_RELEASE)
-        {
-            isPressing = false;
+/**
+ * Callback de botão do mouse
+ * Gerencia o estado de pressão do mouse para controle da câmera
+ */
+void mouseCallBack(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        input.isPressing = (action == GLFW_PRESS);
+        if (input.isPressing) {
+            input.prevXpos = input.xPos;
+            input.prevYpos = input.yPos;
         }
     }
 }
 
-// Função principal
-int main(void)
-{
-    camera.updatePosition(); // Inicializa posição da câmera
+/**
+ * Função principal
+ * Ponto de entrada da aplicação, configura o ambiente OpenGL e executa o loop principal
+ */
+int main(void) {
+    // Inicializa a câmera antes de criar a janela
+    camera.updatePosition();
 
+    // Inicializa GLFW e cria a janela
     GLFWwindow* window;
-
     glfwSetErrorCallback(print_error);
 
-    if (!glfwInit()) return -1; // Inicializa GLFW
+    if (!glfwInit()) {
+        std::cerr << "Falha ao inicializar GLFW" << std::endl;
+        return -1;
+    }
 
-    window = glfwCreateWindow(WIDTH, HEIGHT, "Bilhar", NULL, NULL);
-    if (!window)
-    {
+    // Cria contexto OpenGL 3.3 core profile
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    window = glfwCreateWindow(WIDTH, HEIGHT, "Bilhar", nullptr, nullptr);
+    if (!window) {
+        std::cerr << "Falha ao criar janela GLFW" << std::endl;
         glfwTerminate();
         return -1;
     }
 
     glfwMakeContextCurrent(window);
 
-    // Inicializa GLEW (extensões OpenGL)
-    glewExperimental = GL_TRUE;
-    glewInit();
+    // Inicializa GLEW
+    glewExperimental = GL_TRUE; // Habilita recursos modernos do OpenGL
+    if (glewInit() != GLEW_OK) {
+        std::cerr << "Falha ao inicializar GLEW" << std::endl;
+        return -1;
+    }
 
-    // Registra callbacks de input
+    // Configura callbacks de entrada
     glfwSetScrollCallback(window, scrollCallBack);
     glfwSetCursorPosCallback(window, cursorCallBack);
     glfwSetMouseButtonCallback(window, mouseCallBack);
     glfwSetKeyCallback(window, keyCallback);
-    
-    init(); // Inicializa buffers, shaders e modelos
 
-    GLint ambientLightLoc = glGetUniformLocation(program, "ambientLight");
+    // Inicializa estado do OpenGL e recursos
+    init();
+
+    // Armazena localizações de uniforms para melhor performance
+    const GLint ambientLightLoc = glGetUniformLocation(program, "ambientLight");
+    const GLint textureLoc = glGetUniformLocation(program, "tex");
+    const GLint mvpLoc = glGetUniformLocation(program, "MVP");
 
     // Loop principal de renderização
-    while (!glfwWindowShouldClose(window))
-    {
-        glm::vec3 finalAmbientLight = lighting.isAmbientLightOn ?
-        lighting.ambientLight * lighting.ambientIntensity :
-        glm::vec3(0.0f);
+    while (!glfwWindowShouldClose(window)) {
+        // Atualiza estado da iluminação
+        const glm::vec3 finalAmbientLight = lighting.isAmbientLightOn ?
+            lighting.ambientLight * lighting.ambientIntensity :
+            glm::vec3(0.0f);
 
+        // Configura estado comum do OpenGL
         glUseProgram(program);
-        glUniform1i(glGetUniformLocation(program, "tex"), 0);
+        glUniform1i(textureLoc, 0);
         glUniform3fv(ambientLightLoc, 1, glm::value_ptr(finalAmbientLight));
-
         glEnable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // --- 1. Vista principal (janela inteira)
-        glViewport(0, 0, WIDTH, HEIGHT);
+        // Matrizes de transformação comuns
+        const glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0, -2, 0));
 
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0, -2, 0));
-        glm::mat4 view = camera.getViewMatrix();
-        glm::mat4 projection = camera.getProjectionMatrix((float)WIDTH / (float)HEIGHT);
-        glm::mat4 mvp = projection * view * model;
+        // Renderiza vista principal
+        {
+            glViewport(0, 0, WIDTH, HEIGHT);
+            const glm::mat4 view = camera.getViewMatrix();
+            const glm::mat4 projection = camera.getProjectionMatrix(static_cast<float>(WIDTH) / HEIGHT);
+            const glm::mat4 mvp = projection * view * model;
 
-        GLint mvpId = glGetUniformLocation(program, "MVP");
-        glUniformMatrix4fv(mvpId, 1, GL_FALSE, glm::value_ptr(mvp));
-        display(view, projection);
+            glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+            display(view, projection);
+        }
 
-        // --- 2. Mini-mapa (canto superior direito)
-        int miniWidth = 150, miniHeight = 150;
-        glViewport(WIDTH - miniWidth - 10, HEIGHT - miniHeight - 10, miniWidth, miniHeight);
+        // Renderiza minimapa
+        {
+            constexpr int MINIMAP_BORDER = 10;
+            glViewport(
+                WIDTH - MINIMAP_SIZE - MINIMAP_BORDER,
+                HEIGHT - MINIMAP_SIZE - MINIMAP_BORDER,
+                MINIMAP_SIZE,
+                MINIMAP_SIZE
+            );
 
-        glm::mat4 miniView = topDownCamera.getViewMatrix();
-        glm::mat4 miniProj = topDownCamera.getProjectionMatrix((float)miniWidth / (float)miniHeight);
-        glm::mat4 miniMVP = miniProj * miniView * model;
+            const glm::mat4 miniView = topDownCamera.getViewMatrix();
+            const glm::mat4 miniProj = topDownCamera.getProjectionMatrix(1.0f);
+            const glm::mat4 miniMVP = miniProj * miniView * model;
 
-        glUniformMatrix4fv(mvpId, 1, GL_FALSE, glm::value_ptr(miniMVP));
-        display(miniView, miniProj);
+            glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(miniMVP));
+            display(miniView, miniProj);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
+    // Cleanup
+    for (auto* bola : bolas) {
+        delete bola;
+    }
+    bolas.clear();
+
     glfwTerminate();
     return 0;
 }
 
-// Inicializa buffers, shaders e modelos
+void createBall(const std::string& modelPath, const glm::vec3& position) {
+    ObjModel* bola = new ObjModel(modelPath);
+    bola->setPosition(position);
+    bola->setScale(vec3(0.5f));
+    bolas.push_back(bola);
+}
+
+/**
+ * Inicializa recursos do OpenGL
+ * Configura a geometria da mesa de bilhar, shaders e modelos 3D
+ */
 void init(void) {
     glEnable(GL_DEPTH_TEST);
 
-    // Define os vértices da mesa de bilhar (cubo achatado)
-    GLfloat vertices[NumVertices][3] = {
-        {-9.0f,  0.5f,  5.5f }, { 9.0f,  0.5f,  5.5f },
-        {-9.0f, -0.5f,  5.5f }, { 9.0f, -0.5f,  5.5f },
-        {-9.0f,  0.5f, -5.5f }, { 9.0f,  0.5f, -5.5f },
-        {-9.0f, -0.5f, -5.5f }, { 9.0f, -0.5f, -5.5f },
+    // Vértices da mesa - otimizados para coerência de cache
+    constexpr GLfloat tableWidth = 9.0f;   // Largura da mesa
+    constexpr GLfloat tableHeight = 0.5f;  // Altura da mesa
+    constexpr GLfloat tableDepth = 5.5f;   // Profundidade da mesa
+
+    // Define os vértices da mesa
+    const GLfloat vertices[NumVertices][3] = {
+        {-tableWidth,  tableHeight,  tableDepth}, { tableWidth,  tableHeight,  tableDepth},
+        {-tableWidth, -tableHeight,  tableDepth}, { tableWidth, -tableHeight,  tableDepth},
+        {-tableWidth,  tableHeight, -tableDepth}, { tableWidth,  tableHeight, -tableDepth},
+        {-tableWidth, -tableHeight, -tableDepth}, { tableWidth, -tableHeight, -tableDepth}
     };
 
-    // Cores dos vértices (verde)
-    GLfloat cores[NumVertices][3] = {
-        { 0.4f, 0.8f, 0.5f }, { 0.4f, 0.8f, 0.5f },
-        { 0.4f, 0.8f, 0.5f }, { 0.4f, 0.8f, 0.5f },
-        { 0.4f, 0.8f, 0.5f }, { 0.4f, 0.8f, 0.5f },
-        { 0.4f, 0.8f, 0.5f }, { 0.4f, 0.8f, 0.5f },
+    glm::vec3 ballsPosition[15] = {
+        {-1.0f, -1.0f, 0.0f},
+
+        {-1.8f, -1.0f, 0.5f},
+        {-1.8f, -1.0f, -0.5f},
+
+        {-2.6f, -1.0f, 1.0f},
+        {-2.6f, -1.0f, 0.0f},
+        {-2.6f, -1.0f, -1.0f},
+
+        {-3.4f, -1.0f, 1.5f},
+        {-3.4f, -1.0f, 0.5f},
+        {-3.4f, -1.0f, -0.5f},
+        {-3.4f, -1.0f, -1.5f},
+
+        {-4.2f, -1.0f, 2.0f},
+        {-4.2f, -1.0f, 1.0f},
+        {-4.2f, -1.0f, 0.0f},
+        {-4.2f, -1.0f, -1.0f},
+        {-4.2f, -1.0f, -2.0f}
     };
 
-    // Índices para desenhar os triângulos da mesa
-    GLuint indices[NumIndices] = {
-        // Frente
-        0, 1, 2, 1, 3, 2,
-        // Direita
-        1, 3, 7, 1, 5, 7,
-        // Baixo
-        2, 3, 6, 3, 6, 7,
-        // Esquerda
-        0, 2, 4, 2, 4, 6,
-        // Trás
-        4, 5, 6, 5, 6, 7,
-        // Cima
-        0, 1, 4, 1, 4, 5
+    // Cor da mesa (feltro verde)
+    const GLfloat tableColor[3] = { 0.4f, 0.8f, 0.5f };
+    GLfloat colors[NumVertices][3];
+    for (int i = 0; i < NumVertices; i++) {
+        std::copy(std::begin(tableColor), std::end(tableColor), colors[i]);
+    }
+
+    // Índices da mesa - otimizados para renderização em triangle strip
+    const GLuint indices[NumIndices] = {
+        0, 1, 2, 1, 3, 2,  // Frente
+        1, 3, 7, 1, 5, 7,  // Direita
+        2, 3, 6, 3, 6, 7,  // Base
+        0, 2, 4, 2, 4, 6,  // Esquerda
+        4, 5, 6, 5, 6, 7,  // Fundo
+        0, 1, 4, 1, 4, 5   // Topo
     };
 
-    // Cria e configura o VAO e VBOs
+    // Configura VAO e buffers
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
 
     glGenBuffers(NumBuffers, Buffers);
 
+    // Buffer de posições dos vértices
     glBindBuffer(GL_ARRAY_BUFFER, Buffers[0]);
     glBufferStorage(GL_ARRAY_BUFFER, sizeof(vertices), vertices, 0);
 
+    // Buffer de cores dos vértices
     glBindBuffer(GL_ARRAY_BUFFER, Buffers[1]);
-    glBufferStorage(GL_ARRAY_BUFFER, sizeof(cores), cores, 0);
+    glBufferStorage(GL_ARRAY_BUFFER, sizeof(colors), colors, 0);
 
+    // Buffer de índices
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[2]);
     glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, 0);
 
-    // Carrega e ativa os shaders
+    // Carrega e compila shaders
     ShaderInfo shaders[] = {
         { GL_VERTEX_SHADER,   "shader.vert" },
         { GL_FRAGMENT_SHADER, "shader.frag" },
@@ -263,56 +380,75 @@ void init(void) {
     };
 
     program = LoadShaders(shaders);
-    if (!program) exit(EXIT_FAILURE);
+    if (!program) {
+        std::cerr << "Falha ao carregar shaders" << std::endl;
+        exit(EXIT_FAILURE);
+    }
     glUseProgram(program);
 
-    // Liga os atributos dos vértices aos shaders
-    GLint coordsId = glGetProgramResourceLocation(program, GL_PROGRAM_INPUT, "vPosition");
-    GLint coresId = glGetProgramResourceLocation(program, GL_PROGRAM_INPUT, "vColors");
+    // Configura atributos dos vértices
+    const GLint coordsId = glGetProgramResourceLocation(program, GL_PROGRAM_INPUT, "vPosition");
+    const GLint colorsId = glGetProgramResourceLocation(program, GL_PROGRAM_INPUT, "vColors");
 
     glBindBuffer(GL_ARRAY_BUFFER, Buffers[0]);
     glVertexAttribPointer(coordsId, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, Buffers[1]);
-    glVertexAttribPointer(coresId, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glVertexAttribPointer(colorsId, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(coordsId);
-    glEnableVertexAttribArray(coresId);
+    glEnableVertexAttribArray(colorsId);
 
-    // Configura a câmera do mini-mapa (vista de cima)
+    // Inicializa câmera superior para o minimapa
     topDownCamera.position = glm::vec3(0.0f, 30.0f, 0.0f);
     topDownCamera.target = glm::vec3(0.0f, 0.0f, 0.0f);
-    topDownCamera.up = glm::vec3(0.0f, 0.0f, -1.0f); // Aponta para baixo
+    topDownCamera.up = glm::vec3(0.0f, 0.0f, -1.0f);
     topDownCamera.fov = 45.0f;
 
-    // Carrega o modelo da bola de bilhar
-    bola1 = new ObjModel("PoolBalls/ball1.obj");
-    bola2 = new ObjModel("PoolBalls/ball2.obj");
+    // Carrega modelos das bolas de bilhar
+    try {
+        for(int i = 0; i < 16; ++i) {
+            createBall("PoolBalls/ball" + std::to_string(i + 1) + ".obj", ballsPosition[i]);
+		}
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Falha ao carregar modelos das bolas: " << e.what() << std::endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
-// Função de desenho chamada a cada frame
-void display(glm::mat4 view, glm::mat4 projection)
-{
-    GLint objectTypeLoc = glGetUniformLocation(program, "objectType");
-    GLint hasTextureLoc = glGetUniformLocation(program, "hasTexture");
+/**
+ * Renderiza a cena
+ * @param view Matriz de visualização da câmera atual
+ * @param projection Matriz de projeção do viewport atual
+ */
+void display(const glm::mat4& view, const glm::mat4& projection) {
+    // Obtém localizações de uniforms
+    const GLint objectTypeLoc = glGetUniformLocation(program, "objectType");
+    const GLint hasTextureLoc = glGetUniformLocation(program, "hasTexture");
 
-    // Desenha a mesa (cubo)
+    // Desenha mesa de bilhar
     glUniform1i(objectTypeLoc, 0);
     glUniform1i(hasTextureLoc, false);
-    glDrawElements(GL_TRIANGLES, NumIndices, GL_UNSIGNED_INT, (void*)0);
+    glDrawElements(GL_TRIANGLES, NumIndices, GL_UNSIGNED_INT, nullptr);
 
-    // Desenha o modelo (bola de bilhar)
+    // Desenha bolas de bilhar
     glUniform1i(objectTypeLoc, 1);
     glUniform1i(hasTextureLoc, true);
-    bola1->position = glm::vec3(0, -0.5, 1); // Exemplo de posição
-    bola2->position = glm::vec3(0, -0.5, -1);
 
-    bola1->render(program, view, projection);
-    bola2->render(program, view, projection);
+    // Renderiza todas as bolas do vetor
+    for (const auto& bola : bolas) {
+        bola->render(program, view, projection);
+    }
+
+    // Restaura binding do VAO para o próximo frame
     glBindVertexArray(VAO);
 }
 
-// Callback de erro do GLFW
+/**
+ * Callback de erro do GLFW
+ * Imprime mensagens de erro no console
+ */
 void print_error(int error, const char* description) {
-    std::cout << description << std::endl;
+    std::cerr << "Erro GLFW " << error << ": " << description << std::endl;
 }
