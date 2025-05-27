@@ -9,7 +9,7 @@
 // Construtor: carrega o modelo OBJ e prepara o mesh para renderização
 ObjModel::ObjModel(const std::string& path) {
     loadOBJ(path);      // Lê o ficheiro OBJ e preenche os vetores de dados
-    setupMesh();        // Prepara os buffers OpenGL (VAO/VBO) para renderização
+    install();        // Prepara os buffers OpenGL (VAO/VBO) para renderização
 }
 
 // Lê e interpreta um arquivo OBJ, preenchendo os vetores de vértices, normais, texturas e índices
@@ -101,7 +101,7 @@ void ObjModel::loadOBJ(const std::string& path) {
 }
 
 // Cria VAO e VBO, e configura os atributos de vértice para OpenGL
-void ObjModel::setupMesh() {
+void ObjModel::install() {
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
 
@@ -165,6 +165,8 @@ void ObjModel::loadMTL(const std::string& path) {
 
 // Carrega uma textura de imagem para a GPU usando stb_image e OpenGL
 void ObjModel::loadTexture(const std::string& filename, GLuint& texID) {
+    stbi_set_flip_vertically_on_load(true);
+
     int width, height, nrChannels;
     unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 0);
     if (!data) {
@@ -190,7 +192,7 @@ void ObjModel::loadTexture(const std::string& filename, GLuint& texID) {
 }
 
 // Renderiza o modelo: ativa a textura (se houver) e desenha os triângulos
-void ObjModel::draw(GLuint program, const glm::mat4& view, const glm::mat4& projection) const {
+void ObjModel::render(GLuint program, const glm::mat4& view, const glm::mat4& projection) const {
     glBindVertexArray(VAO);
 
     // Calcula a matriz Model-View-Projection (MVP) para posicionar o modelo na cena

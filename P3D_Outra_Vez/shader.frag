@@ -1,22 +1,36 @@
 #version 330 core
 
-in vec2 TexCoord;
-out vec4 FragColor;
+// Variáveis de entrada (do vertex shader)
+in vec3 fragNormal;
+in vec2 fragTexCoord;
+in vec3 fragColor;
 
-uniform int objectType;
-uniform sampler2D texture_diffuse1;
+// Uniforms
+uniform vec3 ambientLight;
+uniform int objectType;  // 0 para mesa, 1 para bola
+uniform bool hasTexture;
+uniform sampler2D tex;
+
+// Saída
+out vec4 fragOutput;
 
 void main() {
-    if (objectType == 0) {
-        // Table - solid green
-        FragColor = vec4(0.0, 1.0, 0.0, 1.0);
-    } else if (objectType == 1) {
-        // Ball - use texture if available, otherwise red
-        vec4 texColor = texture(texture_diffuse1, TexCoord);
-        if (texColor.a < 0.1) {  // If texture loading failed (alpha near 0)
-            FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-        } else {
-            FragColor = texColor;
-        }
+    // Normaliza a normal do fragmento
+    vec3 normal = normalize(fragNormal);
+    
+    // Define a cor base do objeto
+    vec3 baseColor;
+    if (hasTexture) {
+        baseColor = texture(tex, fragTexCoord).rgb;
+    } else {
+        baseColor = fragColor;
     }
+    
+    // Aplica iluminação ambiente
+    vec3 ambient = ambientLight * baseColor;
+    
+    // Cor final é apenas a componente ambiente por enquanto
+    vec3 finalColor = ambient;
+    
+    fragOutput = vec4(finalColor, 1.0);
 }

@@ -26,7 +26,7 @@ public:
     ObjModel(const std::string& path);
 
     // Desenha o modelo (usa o VAO e as texturas, se existirem)
-    void draw(GLuint program, const glm::mat4& view, const glm::mat4& projection) const;
+    void render(GLuint program, const glm::mat4& view, const glm::mat4& projection) const;
 
     // Define a posição do modelo (usada para transformações)
     void setPosition(const glm::vec3& pos) { position = pos; }
@@ -38,7 +38,7 @@ private:
     void loadMTL(const std::string& path);
 
     // Prepara os buffers OpenGL (VAO/VBO) para renderização
-    void setupMesh();
+    void install();
 
     // Carrega uma textura de imagem para a GPU
     void loadTexture(const std::string& filename, GLuint& texID);

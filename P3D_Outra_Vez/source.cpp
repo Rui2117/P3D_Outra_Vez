@@ -30,6 +30,20 @@
 #define WIDTH 640
 #define HEIGHT 480
 
+struct LightingParams {
+    glm::vec3 ambientLight;
+    float ambientIntensity;
+    bool isAmbientLightOn;  // Novo: controla se a luz está ligada ou desligada
+
+    LightingParams() :
+        ambientLight(1.0f, 1.0f, 1.0f),
+        ambientIntensity(1.0f),
+        isAmbientLightOn(true) {
+    }
+};
+
+LightingParams lighting;
+
 // Declaração de funções auxiliares
 void print_error(int error, const char* description);
 void init(void);
@@ -57,6 +71,16 @@ bool isPressing = false;
 double prevXpos = 0.0, prevYpos = 0.0;
 double xPos = 0.0, yPos = 0.0;
 
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+        switch (key) {
+        case GLFW_KEY_1:
+            lighting.isAmbientLightOn = !lighting.isAmbientLightOn;
+            break;
+        }
+    }
+}
+
 // Callback para o scroll do mouse (zoom)
 void scrollCallBack(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -73,7 +97,7 @@ void cursorCallBack(GLFWwindow* window, double xpos, double ypos)
 
     if (isPressing) {
         double deltaX = xpos - prevXpos;
-        camera.rotateAroundTarget(static_cast<float>(deltaX) / WIDTH * glm::pi<float>());
+        camera.rotateAroundTarget(static_cast<float>(deltaX) / - WIDTH * glm::pi<float>());
         prevXpos = xpos;
 
         double deltaY = ypos - prevYpos;
@@ -129,16 +153,22 @@ int main(void)
     glfwSetScrollCallback(window, scrollCallBack);
     glfwSetCursorPosCallback(window, cursorCallBack);
     glfwSetMouseButtonCallback(window, mouseCallBack);
-
+    glfwSetKeyCallback(window, keyCallback);
+    
     init(); // Inicializa buffers, shaders e modelos
 
-    glm::mat4 projection = camera.getProjectionMatrix((float)WIDTH / (float)HEIGHT);
+    GLint ambientLightLoc = glGetUniformLocation(program, "ambientLight");
 
     // Loop principal de renderização
     while (!glfwWindowShouldClose(window))
     {
+        glm::vec3 finalAmbientLight = lighting.isAmbientLightOn ?
+        lighting.ambientLight * lighting.ambientIntensity :
+        glm::vec3(0.0f);
+
         glUseProgram(program);
         glUniform1i(glGetUniformLocation(program, "tex"), 0);
+        glUniform3fv(ambientLightLoc, 1, glm::value_ptr(finalAmbientLight));
 
         glEnable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -274,11 +304,11 @@ void display(glm::mat4 view, glm::mat4 projection)
     // Desenha o modelo (bola de bilhar)
     glUniform1i(objectTypeLoc, 1);
     glUniform1i(hasTextureLoc, true);
-    bola1->position = glm::vec3(3, -1, 2); // Exemplo de posição
-    bola2->position = glm::vec3(-3, 1, -2);
+    bola1->position = glm::vec3(0, -0.5, 1); // Exemplo de posição
+    bola2->position = glm::vec3(0, -0.5, -1);
 
-    bola1->draw(program, view, projection);
-    bola2->draw(program, view, projection);
+    bola1->render(program, view, projection);
+    bola2->render(program, view, projection);
     glBindVertexArray(VAO);
 }
 
