@@ -74,21 +74,21 @@ struct LightingParams {
  * Estrutura para luz pontual
  * Define posição e propriedades de uma fonte de luz
  */
-/*struct PointLight {
-    glm::vec3 position;  // Posição da luz no espaço 3D
-    glm::vec3 color;     // Cor da luz
-    float intensity;     // Intensidade da luz
+ /*struct PointLight {
+     glm::vec3 position;  // Posição da luz no espaço 3D
+     glm::vec3 color;     // Cor da luz
+     float intensity;     // Intensidade da luz
 
-    PointLight() :
-        position(5.0f, 5.0f, 0.0f),
-        color(1.0f),
-        intensity(1.0f) {
-    }
-};*/
+     PointLight() :
+         position(5.0f, 5.0f, 0.0f),
+         color(1.0f),
+         intensity(1.0f) {
+     }
+ };*/
 
-/**
- * Variáveis globais do estado do jogo
- */
+ /**
+  * Variáveis globais do estado do jogo
+  */
 LightingParams lighting;        // Controle de iluminação
 //PointLight mainLight;                // Luz principal
 GLuint program;                 // Programa de shader
@@ -295,62 +295,117 @@ void createBall(const std::string& modelPath, const glm::vec3& position) {
 
 /**
  * Inicializa recursos do OpenGL
- * Configura a geometria da mesa de bilhar, shaders e modelos 3D
+ * Configura a geometria da mesa de bilhar com cada face tendo uma cor sólida distinta
  */
 void init(void) {
     glEnable(GL_DEPTH_TEST);
 
-    // Vértices da mesa - otimizados para coerência de cache
-    constexpr GLfloat tableWidth = 9.0f;   // Largura da mesa
-    constexpr GLfloat tableHeight = 0.5f;  // Altura da mesa
-    constexpr GLfloat tableDepth = 5.5f;   // Profundidade da mesa
+    // Dimensões da mesa
+    constexpr GLfloat tableWidth = 9.0f;
+    constexpr GLfloat tableHeight = 0.5f;
+    constexpr GLfloat tableDepth = 5.5f;
 
-    // Define os vértices da mesa
-    const GLfloat vertices[NumVertices][3] = {
-        {-tableWidth,  tableHeight,  tableDepth}, { tableWidth,  tableHeight,  tableDepth},
-        {-tableWidth, -tableHeight,  tableDepth}, { tableWidth, -tableHeight,  tableDepth},
-        {-tableWidth,  tableHeight, -tableDepth}, { tableWidth,  tableHeight, -tableDepth},
-        {-tableWidth, -tableHeight, -tableDepth}, { tableWidth, -tableHeight, -tableDepth}
-    };
-
+    // Posições das bolas (mantidas iguais)
     glm::vec3 ballsPosition[15] = {
         {-1.0f, -1.0f, 0.0f},
-
-        {-1.8f, -1.0f, 0.5f},
-        {-1.8f, -1.0f, -0.5f},
-
-        {-2.6f, -1.0f, 1.0f},
-        {-2.6f, -1.0f, 0.0f},
-        {-2.6f, -1.0f, -1.0f},
-
-        {-3.4f, -1.0f, 1.5f},
-        {-3.4f, -1.0f, 0.5f},
-        {-3.4f, -1.0f, -0.5f},
-        {-3.4f, -1.0f, -1.5f},
-
-        {-4.2f, -1.0f, 2.0f},
-        {-4.2f, -1.0f, 1.0f},
-        {-4.2f, -1.0f, 0.0f},
-        {-4.2f, -1.0f, -1.0f},
-        {-4.2f, -1.0f, -2.0f}
+        {-1.8f, -1.0f, 0.5f}, {-1.8f, -1.0f, -0.5f},
+        {-2.6f, -1.0f, 1.0f}, {-2.6f, -1.0f, 0.0f}, {-2.6f, -1.0f, -1.0f},
+        {-3.4f, -1.0f, 1.5f}, {-3.4f, -1.0f, 0.5f}, {-3.4f, -1.0f, -0.5f}, {-3.4f, -1.0f, -1.5f},
+        {-4.2f, -1.0f, 2.0f}, {-4.2f, -1.0f, 1.0f}, {-4.2f, -1.0f, 0.0f}, {-4.2f, -1.0f, -1.0f}, {-4.2f, -1.0f, -2.0f}
     };
 
-    // Cor da mesa (feltro verde)
-    const GLfloat tableColor[3] = { 0.4f, 0.8f, 0.5f };
-    GLfloat colors[NumVertices][3];
-    for (int i = 0; i < NumVertices; i++) {
-        std::copy(std::begin(tableColor), std::end(tableColor), colors[i]);
+    // Agora definimos 24 vértices (4 vértices por face × 6 faces)
+    // Cada face terá seus próprios vértices para permitir cores uniformes
+    const GLfloat vertices[24][3] = {
+        // Face Frente (Z+) - Vermelha
+        {-tableWidth,  tableHeight,  tableDepth}, // 0
+        { tableWidth,  tableHeight,  tableDepth}, // 1
+        {-tableWidth, -tableHeight,  tableDepth}, // 2
+        { tableWidth, -tableHeight,  tableDepth}, // 3
+
+        // Face Direita (X+) - Verde
+        { tableWidth,  tableHeight,  tableDepth}, // 4
+        { tableWidth,  tableHeight, -tableDepth}, // 5
+        { tableWidth, -tableHeight,  tableDepth}, // 6
+        { tableWidth, -tableHeight, -tableDepth}, // 7
+
+        // Face Fundo (Z-) - Azul
+        { tableWidth,  tableHeight, -tableDepth}, // 8
+        {-tableWidth,  tableHeight, -tableDepth}, // 9
+        { tableWidth, -tableHeight, -tableDepth}, // 10
+        {-tableWidth, -tableHeight, -tableDepth}, // 11
+
+        // Face Esquerda (X-) - Amarela
+        {-tableWidth,  tableHeight, -tableDepth}, // 12
+        {-tableWidth,  tableHeight,  tableDepth}, // 13
+        {-tableWidth, -tableHeight, -tableDepth}, // 14
+        {-tableWidth, -tableHeight,  tableDepth}, // 15
+
+        // Face Topo (Y+) - Magenta
+        {-tableWidth,  tableHeight, -tableDepth}, // 16
+        { tableWidth,  tableHeight, -tableDepth}, // 17
+        {-tableWidth,  tableHeight,  tableDepth}, // 18
+        { tableWidth,  tableHeight,  tableDepth}, // 19
+
+        // Face Base (Y-) - Ciano
+        {-tableWidth, -tableHeight,  tableDepth}, // 20
+        { tableWidth, -tableHeight,  tableDepth}, // 21
+        {-tableWidth, -tableHeight, -tableDepth}, // 22
+        { tableWidth, -tableHeight, -tableDepth}  // 23
+    };
+
+    // Cores para cada face (4 vértices por face com a mesma cor)
+    GLfloat colors[24][3];
+
+    // Face Frente - Vermelha
+    for (int i = 0; i < 4; i++) {
+        colors[i][0] = 1.0f; colors[i][1] = 0.0f; colors[i][2] = 0.0f;
     }
 
-    // Índices da mesa - otimizados para renderização em triangle strip
-    const GLuint indices[NumIndices] = {
-        0, 1, 2, 1, 3, 2,  // Frente
-        1, 3, 7, 1, 5, 7,  // Direita
-        2, 3, 6, 3, 6, 7,  // Base
-        0, 2, 4, 2, 4, 6,  // Esquerda
-        4, 5, 6, 5, 6, 7,  // Fundo
-        0, 1, 4, 1, 4, 5   // Topo
+    // Face Direita - Verde
+    for (int i = 4; i < 8; i++) {
+        colors[i][0] = 0.0f; colors[i][1] = 1.0f; colors[i][2] = 0.0f;
+    }
+
+    // Face Fundo - Azul
+    for (int i = 8; i < 12; i++) {
+        colors[i][0] = 0.0f; colors[i][1] = 0.0f; colors[i][2] = 1.0f;
+    }
+
+    // Face Esquerda - Amarela
+    for (int i = 12; i < 16; i++) {
+        colors[i][0] = 1.0f; colors[i][1] = 1.0f; colors[i][2] = 0.0f;
+    }
+
+    // Face Topo - Magenta
+    for (int i = 16; i < 20; i++) {
+        colors[i][0] = 1.0f; colors[i][1] = 0.0f; colors[i][2] = 1.0f;
+    }
+
+    // Face Base - Ciano
+    for (int i = 20; i < 24; i++) {
+        colors[i][0] = 0.0f; colors[i][1] = 1.0f; colors[i][2] = 1.0f;
+    }
+
+    // Índices para as 6 faces (cada face usa 2 triângulos = 6 índices)
+    const GLuint indices[36] = {
+        // Face Frente
+        0, 1, 2,   1, 3, 2,
+        // Face Direita  
+        4, 5, 6,   5, 7, 6,
+        // Face Fundo
+        8, 9, 10,  9, 11, 10,
+        // Face Esquerda
+        12, 13, 14, 13, 15, 14,
+        // Face Topo
+        16, 17, 18, 17, 19, 18,
+        // Face Base
+        20, 21, 22, 21, 23, 22
     };
+
+    // Atualizar constantes para os novos valores
+    const GLuint NumVerticesNew = 24;
+    const GLuint NumIndicesNew = 36;
 
     // Configura VAO e buffers
     glGenVertexArrays(1, &VAO);
@@ -405,9 +460,9 @@ void init(void) {
 
     // Carrega modelos das bolas de bilhar
     try {
-        for(int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 15; ++i) {
             createBall("PoolBalls/ball" + std::to_string(i + 1) + ".obj", ballsPosition[i]);
-		}
+        }
     }
     catch (const std::exception& e) {
         std::cerr << "Falha ao carregar modelos das bolas: " << e.what() << std::endl;
