@@ -46,11 +46,13 @@ class ObjModel {
 public:
     glm::vec3 position = glm::vec3(0.0f);   // Posição do modelo no espaço 3D
     glm::vec3 scale = glm::vec3(1.0f);      // Escala do modelo (1.0 = tamanho original)
-
-    // ... outros membros existentes ...
+    glm::vec3 rotation = glm::vec3(0.0f, 90.0f, 0.0f); // Rotação do modelo (em graus, em torno de cada eixo)
 
     // Define a posição do modelo (existente)
     void setPosition(const glm::vec3& pos) { position = pos; }
+
+    // Define a posição do modelo (existente)
+    void setRotation(const glm::vec3& rot) { rotation = rot; }
 
     // Nova função para definir a escala do modelo
     void setScale(const glm::vec3& newScale) { scale = newScale; }

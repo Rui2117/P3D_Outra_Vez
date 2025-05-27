@@ -74,23 +74,23 @@ struct LightingParams {
  * Estrutura para luz pontual
  * Define posição e propriedades de uma fonte de luz
  */
-struct Light {
+/*struct PointLight {
     glm::vec3 position;  // Posição da luz no espaço 3D
     glm::vec3 color;     // Cor da luz
     float intensity;     // Intensidade da luz
 
-    Light() :
+    PointLight() :
         position(5.0f, 5.0f, 0.0f),
         color(1.0f),
         intensity(1.0f) {
     }
-};
+};*/
 
 /**
  * Variáveis globais do estado do jogo
  */
 LightingParams lighting;        // Controle de iluminação
-Light mainLight;                // Luz principal
+//PointLight mainLight;                // Luz principal
 GLuint program;                 // Programa de shader
 GLuint VAO;                     // Vertex Array Object
 GLuint Buffers[NumBuffers];     // Buffer Objects
@@ -231,9 +231,7 @@ int main(void) {
     // Loop principal de renderização
     while (!glfwWindowShouldClose(window)) {
         // Atualiza estado da iluminação
-        const glm::vec3 finalAmbientLight = lighting.isAmbientLightOn ?
-            lighting.ambientLight * lighting.ambientIntensity :
-            glm::vec3(0.0f);
+        const glm::vec3 finalAmbientLight = lighting.isAmbientLightOn ? lighting.ambientLight * lighting.ambientIntensity : glm::vec3(0.0f);
 
         // Configura estado comum do OpenGL
         glUseProgram(program);

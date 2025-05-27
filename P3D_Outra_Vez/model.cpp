@@ -351,6 +351,9 @@ void ObjModel::render(GLuint program, const glm::mat4& view, const glm::mat4& pr
     // Calcula a matriz de modelo com transformações
     glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
     model = glm::scale(model, scale);  // Aplica escala após translação
+    model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f)); // Rotação em X
+    model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f)); // Rotação em Y
+    model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f)); // Rotação em Z
 
     // Calcula a matriz MVP final
     glm::mat4 mvp = projection * view * model;
