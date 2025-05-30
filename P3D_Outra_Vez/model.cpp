@@ -221,6 +221,9 @@ void ObjModel::render(GLuint program, const glm::mat4& view, const glm::mat4& pr
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
     model = glm::scale(model, scale);
+    model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
     glm::mat4 mvp = projection * view * model;
 
